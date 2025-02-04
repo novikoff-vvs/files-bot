@@ -2,13 +2,33 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"files-bot-service/domain"
 	"files-bot-service/file"
 	"files-bot-service/user"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"log"
 )
+
+func createKeyboard(fs []domain.File) tgbotapi.ReplyKeyboardMarkup {
+	var rows [][]tgbotapi.KeyboardButton
+
+	// Проходим по всем элементам массива fs
+	for _, f := range fs {
+		// Создаем кнопку с текстом из f.Name
+		button := tgbotapi.KeyboardButton{
+			Text: f.Name,
+		}
+		// Добавляем кнопку в строку
+		rows = append(rows, []tgbotapi.KeyboardButton{button})
+	}
+
+	// Возвращаем клавиатуру
+	return tgbotapi.ReplyKeyboardMarkup{
+		Keyboard:       rows,
+		ResizeKeyboard: true, // Чтобы клавиатура была адаптирована под размер экрана
+	}
+}
 
 type MessageHandler struct {
 	UserService *user.Service
@@ -45,10 +65,10 @@ func (handler *MessageHandler) HandleMessage(message tgbotapi.Message) (msg tgbo
 	case "/add":
 		{
 			if model.ID == 0 {
-				log.Println("Пользователь не найден!")
+				return nil, errors.New("пользователь не найден")
 			}
 			model.Terminator = domain.WAIT_INPUT
-			model, err = handler.UserService.Update(model)
+			err = handler.UserService.Update(&model)
 			if err != nil {
 				return tgbotapi.MessageConfig{}, err
 			}
@@ -59,20 +79,60 @@ func (handler *MessageHandler) HandleMessage(message tgbotapi.Message) (msg tgbo
 		{
 			return tgbotapi.NewMessage(message.Chat.ID, fmt.Sprintf("Chat ID: %d", message.Chat.ID)), nil
 		}
+	case "/getFilesList":
+		{
+			var fs []domain.File
+			fs, err = handler.FileService.FileRepository.All(context.Background())
+			if err != nil {
+				return tgbotapi.MessageConfig{}, err
+			}
+			keyboard := createKeyboard(fs)
+			m := tgbotapi.NewMessage(message.Chat.ID, "Доступные файлы")
+			m.ReplyMarkup = keyboard
+			model.Terminator = domain.GET_FILE
+			err = handler.UserService.Update(&model)
+			return m, nil
+		}
 	default:
 		{
+			if message.Text == "" && model.Terminator == "" {
+				return nil, errors.New("некорректный запрос")
+			}
 			switch model.Terminator {
 			case domain.WAIT_INPUT:
 				{
-					f := domain.NewFile(message.MessageID)
+					var fileName string
+					if message.Document.FileName != "" {
+						fileName = message.Document.FileName
+					}
+					f := domain.NewFile(message.MessageID, fileName)
 					err = handler.FileService.FileRepository.Store(context.Background(), &f)
 					if err != nil {
 						return tgbotapi.MessageConfig{}, err
 					}
+					model.Terminator = ""
+					err = handler.UserService.Update(&model)
 					return tgbotapi.NewForward(-4655598408, int64(model.ID), int(f.ID)), nil
+				}
+			case domain.GET_FILE:
+				{
+					var f domain.File
+					handler.FileService.FileRepository.Conn.Where("name = ?", message.Text).First(&f)
+					if f.ID == 0 {
+						return nil, errors.New("искомый вами файл не найден")
+					}
+
+					m := tgbotapi.NewCopyMessage(message.Chat.ID, 980196074, int(f.ID))
+					m.AllowSendingWithoutReply = false
+					m.ReplyMarkup = tgbotapi.ReplyKeyboardRemove{
+						RemoveKeyboard: true, // Это указывает на удаление клавиатуры
+					}
+					model.Terminator = ""
+					err = handler.UserService.Update(&model)
+					return m, nil
 				}
 			}
 		}
-		return tgbotapi.MessageConfig{}, nil
 	}
+	return tgbotapi.MessageConfig{}, errors.New("отсутствует сообщение")
 }

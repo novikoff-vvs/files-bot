@@ -41,7 +41,7 @@ func (m *UserRepository) Delete(ctx context.Context, id uint) (err error) {
 	return
 }
 func (m *UserRepository) Update(ctx context.Context, ar *domain.User) (err error) {
-	m.getQuery().Save(&ar)
+	m.Conn.Save(&ar)
 	return nil
 }
 

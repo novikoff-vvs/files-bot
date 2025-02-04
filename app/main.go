@@ -123,6 +123,12 @@ func (s *queueingBotServer) Handle(ctx context.Context, message *pb.FilesBotMess
 				ForwardMessageJson: string(jsonString),
 			}, nil
 		}
+	case tgbotapi.CopyMessageConfig:
+		{
+			return &pb.FilesBotResult{
+				CopyMessageJson: string(jsonString),
+			}, nil
+		}
 	default:
 		{
 			return &pb.FilesBotResult{
