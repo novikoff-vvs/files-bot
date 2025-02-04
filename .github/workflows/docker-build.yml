@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-gateway:
+  build-files-bot:
     runs-on: ubuntu-latest
 
     steps:
