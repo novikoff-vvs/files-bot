@@ -19,4 +19,5 @@ message FilesBotMessage {
 message FilesBotResult {
   string newMessageJson = 1;
   string forwardMessageJson = 2;
+  string copyMessageJson = 3;
 }

@@ -33,7 +33,7 @@ func (s Service) Save(usr domain.User) (user domain.User, err error) {
 	return user, nil
 }
 
-func (s Service) Update(usr domain.User) (domain.User, error) {
-	err := s.Repository.Update(context.Background(), &usr)
-	return usr, err
+func (s Service) Update(usr *domain.User) error {
+	err := s.Repository.Update(context.Background(), usr)
+	return err
 }
